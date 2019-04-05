@@ -1,0 +1,267 @@
+<?php
+/**
+ * Copyright © 2016 Mozg. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+?>
+
+<?php
+
+/*
+dump(get_class($this));
+dump($this->getData());
+dump($this->getMethod());
+dump($this->getMethod()->getData());
+dump($this->getInfo());
+dump($this->getInfo()->getData());
+dump(get_class_methods(get_class($this)));
+//dump(get_class_methods(get_class($this->getInfo())));
+*/
+
+?>
+
+<?php
+$info = $this->getInfo();
+?>
+
+<?php echo $this->htmlEscape($this->getMethod()->getTitle()) ?><br/>
+
+<?php if ($info): ?>
+
+    <?php if ($info->getMozgPspReference() == ''): ?>
+        <?php echo Mage::helper('mozg_payment')->__('Payment has not been processed yet.') ?> <br/>
+    <?php else :?>
+
+        <?php
+
+        //
+
+        $order = $this->getMethod()->getInfoInstance()->getOrder();
+
+        $realOrderId = $order->getRealOrderId();
+        $incrementId = $order->getIncrementId();
+
+        $storeId = $this->getMethod()->getInfoInstance()->getOrder()->getStoreId();
+
+        //
+
+        $pspReference = $this->htmlEscape($info->getMozgPspReference());
+
+        //
+
+        if (Mage::app()->getStore()->isAdmin()){
+
+        $url = Mage::helper('adminhtml')->getUrl('adminhtml/Payment/consulta/', array('pspReference' => $pspReference,'incrementId' => $incrementId) );
+        $link = "javascript:openPopupsMozg('$url', 'WinXilinus', 'Link', 'Payment', 'payment');";
+
+        echo Mage::helper('mozg_payment')->__('Payment PSP Reference: <a href="%s">%s</a>', $link, $pspReference) . ' <br/>';
+
+        }
+
+        //
+
+        $service = Mage::helper('mozg_payment/service')->_initService($storeId);
+        $responseData = $service->get($pspReference);
+
+        //dump($responseData);exit;
+
+        if(array_key_exists('Payment', $responseData)){
+
+            $_status = [
+                '0'=>'NotFinished',
+                '1'=>'Authorized',
+                '2'=>'PaymentConfirmed',
+                '3'=>'Denied',
+                '10'=>'Voided',
+                '11'=>'Refunded',
+                '12'=>'Pending',
+                '13'=>'Aborted',
+                '20'=>'Scheduled',
+            ];
+            $payment_status = $responseData['Payment']['Status'];
+            $color = ($payment_status == '2') ? 'green' : 'red';
+
+            $message_status = Mage::helper('mozg_payment')->__($_status[$payment_status]);
+
+            $authResult = '<font color="'.$color.'"><b>' . $message_status . '</b></font>';
+
+            echo Mage::helper('mozg_payment')->__('Transaction Status: %s', $authResult) . ' <br/>';
+
+        } else {
+
+            echo Mage::helper('mozg_payment')->__('Query Error: %s', $responseData['message']) . ' <br/>';
+
+        }
+
+        //
+
+        ?>
+
+    <?php endif;?>
+
+
+
+    <?php if ($this->getInfo()->getMethod() == 'mozg_payment_api_cc'): ?>
+        <?php echo Mage::helper('mozg_payment')->__('Name on the Card: %s', $this->htmlEscape($this->getInfo()->getCcOwner())) ?><br/>
+        <?php if( $this->htmlEscape($this->getInfo()->getAdditionalInformation('social_security_number')) != "" ): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Social Security Number: %s', $this->htmlEscape($this->getInfo()->getAdditionalInformation('social_security_number'))) ?><br/>
+        <?php endif; ?>
+        <?php echo Mage::helper('mozg_payment')->__('Credit Card Type: %s', $this->htmlEscape($this->getCcTypeName())) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__('Credit Card Number: xxxx-%s', $this->htmlEscape($this->getInfo()->getCcLast4())) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__('Expiration Date: %s/%s', $this->htmlEscape($this->getCcExpMonth()), $this->htmlEscape($this->getInfo()->getCcExpYear())) ?><br/>
+        <?php if($this->htmlEscape($this->getInfo()->getAdditionalInformation('number_of_installments')) != "" && $this->htmlEscape($this->getInfo()->getAdditionalInformation('number_of_installments')) > 1): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Number of installments: %s', $this->htmlEscape($this->getInfo()->getAdditionalInformation('number_of_installments'))) ?><br/>
+        <?php endif; ?>
+        <?php
+
+        $var = $this->htmlEscape($this->getInfo()->getMozgAcquirerReference());
+
+        if( isset($responseData) && ($info->getMozgPspReference() != '') && empty($var) && array_key_exists('Payment', $responseData) ):
+
+        ?>
+            <?php echo Mage::helper('mozg_payment')->__('Tid:: %s', $this->htmlEscape($responseData['Payment']['AcquirerTransactionId'])) ?><br/>
+        <?php endif; ?>
+    <?php endif; ?>
+
+
+
+
+    <?php if ($this->getInfo()->getMethod() == 'mozg_payment_api_dc'): ?>
+        <?php echo Mage::helper('mozg_payment')->__('Name on the Card: %s', $this->htmlEscape($this->getInfo()->getCcOwner())) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__('Credit Card Type: %s', $this->htmlEscape($this->getCcTypeName())) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__('Credit Card Number: xxxx-%s', $this->htmlEscape($this->getInfo()->getCcLast4())) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__('Expiration Date: %s/%s', $this->htmlEscape($this->getCcExpMonth()), $this->htmlEscape($this->getInfo()->getCcExpYear())) ?><br/>
+
+        <?php
+
+        $var = $this->htmlEscape($this->getInfo()->getMozgAcquirerReference());
+
+        if( ($info->getMozgPspReference() != '') && empty($var) ):
+
+        ?>
+            <?php echo Mage::helper('mozg_payment')->__('Tid:: %s', $this->htmlEscape($responseData['Payment']['AcquirerTransactionId'])) ?><br/>
+        <?php endif; ?>
+    <?php endif; ?>
+
+
+    <?php
+
+    // New Way
+    if($this->getInfo()->getAdditionalInformation('social_security_number')) {
+        $additionalInformation = [
+            'social_security_number' => $this->getInfo()->getAdditionalInformation('social_security_number'),
+            'firstname' => $this->getInfo()->getAdditionalInformation('firstname'),
+            'lastname' => $this->getInfo()->getAdditionalInformation('lastname'),
+            'dob' => $this->getInfo()->getAdditionalInformation('dob'),
+        ];
+    } else {
+        // older versions saved it into the PoNumber to be backwards compatible leave this in
+        $additionalInformation = unserialize($this->getInfo()->getPoNumber());
+    }
+
+    $documento = $additionalInformation['social_security_number'];
+
+    $tipo_documento = 'CPF';
+    $mozg_util = new \Mozg\Framework\Util();
+    if($mozg_util->validaCNPJ($documento)) {
+        $tipo_documento = 'CNPJ';
+    }
+
+    ?>
+
+
+    <?php if ($this->getInfo()->getMethod() == 'mozg_payment_api_boleto'): ?>
+        <?php echo Mage::helper('mozg_payment')->__('Social Security Number: %s', $this->htmlEscape($additionalInformation['social_security_number'])) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__($tipo_documento.'_Firstname: %s', $this->htmlEscape($additionalInformation['firstname'])) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__($tipo_documento.'_Lastname: %s', $this->htmlEscape($additionalInformation['lastname'])) ?><br/>
+
+        <?php if($this->getInfo()->getOrder() != null): ?>
+        <?php echo Mage::helper('mozg_payment')->__('Boleto PDF: <a target="_blank" href="%s">Download</a>', $this->getInfo()->getOrder()->getMozgPaymentUrl()) ?><br/>
+        <?php endif;?>
+
+        <?php if( isset($responseData) ): ?>
+        <?php echo Mage::helper('mozg_payment')->__('Instructions: %s', $this->__($responseData['Payment']['Instructions'])) ?><br/>
+        <?php endif;?>
+    <?php endif; ?>
+
+
+
+
+    <?php if ($this->getInfo()->getMethod() == 'mozg_payment_api_eletronictransfer'): ?>
+        <?php echo Mage::helper('mozg_payment')->__('Social Security Number: %s', $this->htmlEscape($additionalInformation['social_security_number'])) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__($tipo_documento.'_Firstname: %s', $this->htmlEscape($additionalInformation['firstname'])) ?><br/>
+        <?php echo Mage::helper('mozg_payment')->__($tipo_documento.'_Lastname: %s', $this->htmlEscape($additionalInformation['lastname'])) ?><br/>
+
+        <?php if($this->getInfo()->getOrder() != null): ?>
+        <?php echo Mage::helper('mozg_payment')->__('EletronicTransfer PDF: <a target="_blank" href="%s">Download</a>', $this->getInfo()->getOrder()->getMozgPaymentUrl()) ?><br/>
+        <?php endif;?>
+    <?php endif; ?>
+
+
+    <?php if (Mage::app()->getStore()->isAdmin()): ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgAvsResult()) != ""): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Avs result: %s', $this->htmlEscape($this->getInfo()->getMozgAvsResult())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgCvcResult()) != ""): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Cvc result: %s', $this->htmlEscape($this->getInfo()->getMozgCvcResult())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgTotalFraudScore()) != ""): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Total fraud score: %s', $this->htmlEscape($this->getInfo()->getMozgTotalFraudScore())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgRefusalReasonRaw()) != ""): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Raw acquirer response: %s', $this->htmlEscape($this->getInfo()->getMozgRefusalReasonRaw())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgAuthCode()) != ""): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Authorisation code: %s', $this->htmlEscape($this->getInfo()->getMozgAuthCode())) ?><br/>
+        <?php endif; ?>
+        <?php if($this->htmlEscape($this->getInfo()->getMozgAcquirerReference()) != ""): ?>
+            <?php echo Mage::helper('mozg_payment')->__('Acquirer reference: %s', $this->htmlEscape($this->getInfo()->getMozgAcquirerReference())) ?><br/>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <!-- Anti-Fraud -->
+
+    <?php if ($info->getMozgPspReference() == ''): ?>
+
+    <?php else :?>
+
+        <?php
+
+        $order = $info->getOrder();
+        $amount = $order->getGrandTotal();
+        $payment = $order->getPayment();
+        $getAdditionalInformation = $payment->getAdditionalInformation();
+
+        if (array_key_exists('mozg_payment_api_request_data', $getAdditionalInformation) ){
+
+            $request_data = $getAdditionalInformation['mozg_payment_api_request_data'];
+            $response_data = $getAdditionalInformation['mozg_payment_api_response_data'];
+
+            //dump($getAdditionalInformation);
+            //dump($response_data);
+
+            if(array_key_exists('FraudAnalysis', $response_data['Payment'])){
+
+                $status = $response_data['Payment']['FraudAnalysis']['Status'];
+
+                dump($response_data['Payment']['FraudAnalysis']);
+
+            }
+
+            $html =
+    <<<EOF
+
+
+EOF;
+
+            echo $html;
+
+        }
+
+        ?>
+
+    <?php endif;?>
+
+    <!-- Anti-Fraud -->
+
+<?php endif;?>
